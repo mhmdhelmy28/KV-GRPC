@@ -6,9 +6,11 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
-
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 var (
 )
@@ -27,10 +29,7 @@ func (kv *KV) 	Put(ctx context.Context, req *pb.PutRequest) (*pb.PutResponse, er
 	return &pb.PutResponse{}, nil
 
 }
-type Err struct {
-	error
-	msg string
-}
+
 func (kv *KV) Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error){
 	key := req.Key
 	kv.mu.Lock()
@@ -39,7 +38,7 @@ func (kv *KV) Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, err
 	if ok {
 		return &pb.GetResponse{Value: val}, nil
 	}
-	return nil, Err{msg: "not found"}
+	return nil, status.Errorf(codes.NotFound, "key not found")
 }
 
 func (kv *KV) List (req *pb.ListRequest, stream pb.KV_ListServer) error{
@@ -54,7 +53,12 @@ func (kv *KV) List (req *pb.ListRequest, stream pb.KV_ListServer) error{
 	return nil
 
 }
-
+func Unary() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error){
+		log.Printf("%s: %s", info.FullMethod, time.Now())
+		return handler(ctx, req)
+	}
+}
 func NewKVServer() *KV{
 	return &KV{
 		data: map[string]string{},
@@ -67,7 +71,7 @@ func main(){
 		log.Fatal("could not listen on port")
 	}
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(Unary()))
 	pb.RegisterKVServer(grpcServer, NewKVServer())
 	log.Println("Server started")
 	grpcServer.Serve(l)
