@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -55,6 +56,11 @@ func (kv *KV) List (req *pb.ListRequest, stream pb.KV_ListServer) error{
 }
 func Unary() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error){
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			log.Fatalf("error fetching metadata: %s", err)
+		}
+		log.Println(md["key"][0])
 		log.Printf("%s: %s", info.FullMethod, time.Now())
 		return handler(ctx, req)
 	}
